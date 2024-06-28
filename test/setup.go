@@ -1,58 +1,70 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 )
 
-func main() {
-	folders := []string{"1", "2", "3"}
-
+// createDotTest creates the root testing environment folder and return its path
+func createDotTest(folders []string) (string, error) {
 	currentPath, err := os.Getwd()
 	if err != nil {
-		fmt.Println(err)
-		return
+		return "", err
 	}
 
-	testPath := filepath.Join(currentPath, ".test")
-
-	err = os.Mkdir(testPath, 0755)
-	if err != nil {
-		fmt.Println(err)
-		return
+	testingPath := filepath.Join(currentPath, testingFolder)
+	if err = os.Mkdir(testingPath, 0755); err != nil {
+		return "", err
 	}
 
-	wg := sync.WaitGroup{}
+	chanErr := make(chan error)
 
-	err = setup(testPath, folders, &wg)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	wg.Add(1)
+	go createSubFolders(testingPath, folders, chanErr)
 
 	wg.Wait()
 
-	fmt.Println("Folder structure created successfully.")
+	if len(chanErr) != 0 {
+		for err = range chanErr {
+			return "", err
+		}
+	}
+
+	err = createExampleFile(testingPath, fileText)
+	if err != nil {
+		return "", err
+	}
+
+	return testingPath, nil
 }
 
-func setup(path string, folders []string, wg *sync.WaitGroup) error {
+// createSubFolders creates subfolders and example files recursively
+func createSubFolders(path string, folders []string, chanErr chan error) {
 	defer wg.Done()
 
 	for _, folder := range folders {
-		newPath := filepath.Join(path, folder)
+		subPath := filepath.Join(path, folder)
 
-		err := os.Mkdir(newPath, 0755)
+		err := os.Mkdir(subPath, 0755)
 		if err != nil {
-			return err
+			chanErr <- err
+			return
 		}
 
 		wg.Add(1)
-		go setup(newPath, folders[:len(folders)-1], wg)
-	}
+		go createSubFolders(subPath, folders[:len(folders)-1], chanErr)
 
-	filePath := filepath.Join(path, "example.txt")
+		err = createExampleFile(subPath, fileText)
+		if err != nil {
+			chanErr <- err
+			return
+		}
+	}
+}
+
+// createExampleFile creates an example.txt file in the given path and writes the given text
+func createExampleFile(path string, fileText string) (err error) {
+	filePath := filepath.Join(path, exampleFileName)
 
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -61,18 +73,10 @@ func setup(path string, folders []string, wg *sync.WaitGroup) error {
 
 	defer file.Close()
 
-	_, err = file.WriteString("this is an example file")
+	_, err = file.WriteString(fileText)
 	if err != nil {
 		return err
 	}
 
-	return nil
-}
-
-func cleanup(path string) error {
-	err := os.RemoveAll(path)
-	if err != nil {
-		return fmt.Errorf("error deleting folder %s: %w", path, err)
-	}
-	return nil
+	return err
 }

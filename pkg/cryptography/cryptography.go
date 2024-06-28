@@ -8,9 +8,40 @@ import (
 	"errors"
 )
 
+var stream cipher.Stream
+
+func GenKeyAndInitStream() ([]byte, []byte, error) {
+	secretKey, err := genSecretKey()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nonce, err := genNonce()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = InitStream(secretKey, nonce)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return secretKey, nonce, nil
+}
+
+func InitStream(secretKey []byte, nonce []byte) (error) {
+	aesMode, err := aes.NewCipher(secretKey)
+	if err != nil {
+		return err
+	}
+
+	stream = cipher.NewCTR(aesMode, nonce)
+	return nil
+}
+
 // GenSecretKey generates a random 32-byte (128 bits) key for AES-256 encryption.
 // It returns the key or an error if the key generation fails.
-func GenSecretKey() ([]byte, error) {
+func genSecretKey() ([]byte, error) {
 	key := make([]byte, 32)
 
 	_, err := rand.Read(key)
@@ -23,7 +54,7 @@ func GenSecretKey() ([]byte, error) {
 
 // GenNonce generates a random 16-byte nonce for cryptographic operations using AES block size.
 // It returns the nonce and any error encountered during the generation.
-func GenNonce() ([]byte, error) {
+func genNonce() ([]byte, error) {
 	nonce := make([]byte, aes.BlockSize)
 
 	_, err := rand.Read(nonce)
@@ -36,20 +67,13 @@ func GenNonce() ([]byte, error) {
 
 // Encrypt encrypts the given plaintext using AES-256 CTR mode.
 // It returns the ciphertext or an error if the encryption fails.
-func Encrypt(plaintext []byte, key []byte, nonce []byte) ([]byte, error) {
-	aesMode, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-
+func Encrypt(plaintext []byte) ([]byte, error) {
 	paddingSize := aes.BlockSize - (len(plaintext) % aes.BlockSize)
 
 	if paddingSize != 0 {
 		pad := bytes.Repeat([]byte{byte(paddingSize)}, paddingSize)
 		plaintext = append(plaintext, pad...)
 	}
-
-	stream := cipher.NewCTR(aesMode, nonce)
 
 	ciphertext := make([]byte, len(plaintext))
 	stream.XORKeyStream(ciphertext, plaintext)
@@ -59,17 +83,10 @@ func Encrypt(plaintext []byte, key []byte, nonce []byte) ([]byte, error) {
 
 // Decrypt decrypts the given ciphertext using AES-256 CTR mode.
 // It returns the plaintext or an error if the decryption fails.
-func Decrypt(ciphertext []byte, key []byte, nonce []byte) ([]byte, error) {
-	aesMode, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-
+func Decrypt(ciphertext []byte) ([]byte, error) {
 	if len(ciphertext) < aes.BlockSize {
 		return nil, errors.New("ciphertext shorter than block size")
 	}
-
-	stream := cipher.NewCTR(aesMode, nonce)
 
 	plaintext := make([]byte, len(ciphertext))
 	stream.XORKeyStream(plaintext, ciphertext)
