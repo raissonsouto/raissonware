@@ -10,6 +10,8 @@ import (
 
 var stream cipher.Stream
 
+// KeyGenAndInit generates a secret key and nonce for encryption, initializes the cipher stream,
+// and returns the secret key and nonce or an error if any operation fails.
 func KeyGenAndInit() ([]byte, []byte, error) {
 	secretKey, err := genSecretKey()
 	if err != nil {
@@ -29,6 +31,7 @@ func KeyGenAndInit() ([]byte, []byte, error) {
 	return secretKey, nonce, nil
 }
 
+// Init initializes the AES cipher stream using the provided secret key and nonce.
 func Init(secretKey []byte, nonce []byte) error {
 	aesMode, err := aes.NewCipher(secretKey)
 	if err != nil {

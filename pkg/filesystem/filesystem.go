@@ -29,6 +29,9 @@ func FindFiles(path string, exec func([]byte) ([]byte, error), wg *sync.WaitGrou
 	}
 }
 
+// alterFile reads the contents of a file at the specified path,
+// executes the provided function on the data, writes back the modified data,
+// and handles any errors via the provided error channel.
 func alterFile(path string, exec func([]byte) ([]byte, error), chanErr chan error) {
 
 	fileInfo, err := os.Stat(path)
