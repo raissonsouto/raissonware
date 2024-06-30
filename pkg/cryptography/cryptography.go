@@ -5,12 +5,14 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"errors"
 )
 
-var stream cipher.Stream
+var (
+	block cipher.Block
+	nonce []byte
+)
 
-// KeyGenAndInit generates a secret key and nonce for encryption, initializes the cipher stream,
+// KeyGenAndInit generates a 32-bytes secret key and initializes the AES cipher,
 // and returns the secret key and nonce or an error if any operation fails.
 func KeyGenAndInit() ([]byte, []byte, error) {
 	secretKey, err := genSecretKey()
@@ -18,12 +20,7 @@ func KeyGenAndInit() ([]byte, []byte, error) {
 		return nil, nil, err
 	}
 
-	nonce, err := genNonce()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = Init(secretKey, nonce)
+	err = Init(secretKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -31,15 +28,15 @@ func KeyGenAndInit() ([]byte, []byte, error) {
 	return secretKey, nonce, nil
 }
 
-// Init initializes the AES cipher stream using the provided secret key and nonce.
-func Init(secretKey []byte, nonce []byte) error {
-	aesMode, err := aes.NewCipher(secretKey)
+// Init generates a 16-byte nonce and create the AES cipher using the provided secret key.
+func Init(secretKey []byte) (err error) {
+	nonce, err = genNonce()
 	if err != nil {
 		return err
 	}
 
-	stream = cipher.NewCTR(aesMode, nonce)
-	return nil
+	block, err = aes.NewCipher(secretKey)
+	return err
 }
 
 // GenSecretKey generates a random 32-byte (128 bits) key for AES-256 encryption.
@@ -58,41 +55,54 @@ func genSecretKey() ([]byte, error) {
 // GenNonce generates a random 16-byte nonce for cryptographic operations using AES block size.
 // It returns the nonce and any error encountered during the generation.
 func genNonce() ([]byte, error) {
-	nonce := make([]byte, aes.BlockSize)
+	nc := make([]byte, aes.BlockSize)
 
-	_, err := rand.Read(nonce)
+	_, err := rand.Read(nc)
 	if err != nil {
 		return nil, err
 	}
 
-	return nonce, nil
+	return nc, nil
 }
 
 // Encrypt encrypts the given plaintext using AES-256 CTR mode.
-// It returns the ciphertext or an error if the encryption fails.
-func Encrypt(plaintext []byte) ([]byte, error) {
-	paddingSize := aes.BlockSize - (len(plaintext) % aes.BlockSize)
-
-	if paddingSize != 0 {
-		pad := bytes.Repeat([]byte{byte(paddingSize)}, paddingSize)
-		plaintext = append(plaintext, pad...)
-	}
-
+func Encrypt(plaintext []byte) []byte {
+	plaintext = pkcs7pad(plaintext)
 	ciphertext := make([]byte, len(plaintext))
+
+	stream := cipher.NewCTR(block, nonce)
 	stream.XORKeyStream(ciphertext, plaintext)
 
-	return ciphertext, nil
+	return ciphertext
 }
 
 // Decrypt decrypts the given ciphertext using AES-256 CTR mode.
-// It returns the plaintext or an error if the decryption fails.
-func Decrypt(ciphertext []byte) ([]byte, error) {
-	if len(ciphertext) < aes.BlockSize {
-		return nil, errors.New("ciphertext shorter than block size")
-	}
+func Decrypt(ciphertext []byte) []byte {
 
 	plaintext := make([]byte, len(ciphertext))
+
+	stream := cipher.NewCTR(block, nonce)
 	stream.XORKeyStream(plaintext, ciphertext)
 
-	return plaintext, nil
+	plaintext = pkcs7strip(plaintext)
+	return plaintext
+}
+
+// pkcs7pad add pkcs7 padding
+func pkcs7pad(data []byte) []byte {
+	padLen := aes.BlockSize - len(data)%aes.BlockSize
+	padding := bytes.Repeat([]byte{byte(padLen)}, padLen)
+
+	return append(data, padding...)
+}
+
+// pkcs7strip remove pkcs7 padding
+func pkcs7strip(data []byte) []byte {
+	length := len(data)
+	padLen := int(data[length-1])
+
+	if padLen == 0 {
+		return data
+	}
+	return data[:length-padLen]
 }

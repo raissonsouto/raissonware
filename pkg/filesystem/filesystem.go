@@ -7,7 +7,7 @@ import (
 )
 
 // FindFiles recursively search for files and executes the given function
-func FindFiles(path string, exec func([]byte) ([]byte, error), wg *sync.WaitGroup, chanErr chan error) {
+func FindFiles(path string, exec func([]byte) []byte, wg *sync.WaitGroup, chanErr chan error) {
 	defer wg.Done()
 
 	files, err := os.ReadDir(path)
@@ -32,7 +32,7 @@ func FindFiles(path string, exec func([]byte) ([]byte, error), wg *sync.WaitGrou
 // alterFile reads the contents of a file at the specified path,
 // executes the provided function on the data, writes back the modified data,
 // and handles any errors via the provided error channel.
-func alterFile(path string, exec func([]byte) ([]byte, error), chanErr chan error) {
+func alterFile(path string, exec func([]byte) []byte, chanErr chan error) {
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
@@ -46,11 +46,7 @@ func alterFile(path string, exec func([]byte) ([]byte, error), chanErr chan erro
 		return
 	}
 
-	newData, err := exec(data)
-	if err != nil {
-		chanErr <- err
-		return
-	}
+	newData := exec(data)
 
 	err = os.WriteFile(path, newData, fileInfo.Mode())
 	if err != nil {
